@@ -1,0 +1,124 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:us-west-2:436685692178:task-definition/verdaccio-service:56",
+    "containerDefinitions": [
+        {
+            "name": "verdaccio-service",
+            "image": "436685692178.dkr.ecr.us-west-2.amazonaws.com/verdaccio:latest",
+            "cpu": 1024,
+            "memory": 3072,
+            "links": [],
+            "portMappings": [
+                {
+                    "containerPort": 4873,
+                    "hostPort": 4873,
+                    "protocol": "tcp"
+                }
+            ],
+            "essential": true,
+            "entryPoint": [],
+            "command": [],
+            "environment": [],
+            "environmentFiles": [],
+            "mountPoints": [
+                {
+                    "sourceVolume": "verdaccio-efs",
+                    "containerPath": "/verdaccio/opt/verdaccio/storage",
+                    "readOnly": false
+                }
+            ],
+            "volumesFrom": [],
+            "secrets": [
+                {
+                    "name": "S3_BUCKET",
+                    "valueFrom": "arn:aws:secretsmanager:us-west-2:436685692178:secret:Verdaccio_Secrets:S3_BUCKET::"
+                },
+                {
+                    "name": "AWS_ACCESS_KEY_ID",
+                    "valueFrom": "arn:aws:secretsmanager:us-west-2:436685692178:secret:Verdaccio_Secrets:AWS_ACCESS_KEY_ID::"
+                },
+                {
+                    "name": "AWS_SECRET_ACCESS_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:us-west-2:436685692178:secret:Verdaccio_Secrets:AWS_SECRET_ACCESS_KEY::"
+                }
+            ],
+            "dnsServers": [],
+            "dnsSearchDomains": [],
+            "extraHosts": [],
+            "dockerSecurityOptions": [],
+            "dockerLabels": {},
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "verdaccio-service-CloudwatchLogsGroup-9JieJE3VI32C",
+                    "awslogs-region": "us-west-2",
+                    "awslogs-stream-prefix": "verdaccio"
+                },
+                "secretOptions": []
+            },
+            "systemControls": [],
+            "credentialSpecs": []
+        }
+    ],
+    "family": "verdaccio-service",
+    "taskRoleArn": "arn:aws:iam::436685692178:role/verdaccio-efs-roles-ECSTaskExecutionRole-OzBH7cAvwgBa",
+    "executionRoleArn": "arn:aws:iam::436685692178:role/verdaccio-efs-roles-ECSTaskExecutionRole-OzBH7cAvwgBa",
+    "networkMode": "bridge",
+    "revision": 56,
+    "volumes": [
+        {
+            "name": "verdaccio-efs",
+            "efsVolumeConfiguration": {
+                "fileSystemId": "fs-057a2c6eef4ca5c01",
+                "rootDirectory": "/",
+                "transitEncryption": "ENABLED"
+            }
+        }
+    ],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "ecs.capability.efsAuth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.ecr-auth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "ecs.capability.secrets.asm.environment-variables"
+        },
+        {
+            "name": "ecs.capability.efs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.17"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.task-iam-role"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.25"
+        },
+        {
+            "name": "ecs.capability.execution-role-ecr-pull"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2"
+    ],
+    "registeredAt": "2024-07-16T16:19:51.535Z",
+    "registeredBy": "arn:aws:sts::436685692178:assumed-role/AWSReservedSSO_AdministratorAccess_3732cf4adc6520ee/skanukula@opera.com",
+    "tags": []
+}
