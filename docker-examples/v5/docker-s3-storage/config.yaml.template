@@ -62,7 +62,7 @@ auth:
     file: /verdaccio/conf/htpasswd
     # Maximum amount of users allowed to register, defaults to "+inf".
     # You can set this to -1 to disable registration.
-    max_users: 2
+    max_users: 5
     # Hash algorithm, possible options are: "bcrypt", "md5", "sha1", "crypt".
     # algorithm: bcrypt # by default is crypt, but is recommended use bcrypt for new installations
     # Rounds number for "bcrypt", will be ignored for other algorithms.
