@@ -2,64 +2,111 @@ name: Create Docker Image and Deploy to Amazon ECS
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The git ref to deploy (branch, tag, or commit SHA).'
+        required: true
+        default: 'gmpm-verdaccio'
+      ecr_repository:
+        description: 'The name of the ECR repository to push the Docker image to.'
+        required: true
+        default: 'verdaccio'
+      ecs_service:
+        description: 'The name of the ECS service to deploy to.'
+        required: true
+        default: 'verdaccio-asg-ECSService-1X9Z7K8QG2L5'
+      ecs_cluster:
+        description: 'The name of the ECS cluster to deploy to.'
+        required: true
+        default: 'verdaccio-asg-ECSCluster-ybYAOGuDHD1U'
+      working-directory:
+        description: 'The working directory for the Docker build context.'
+        required: true
+        default: 'docker-s3-storage'
+
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  ECR_REPOSITORY: verdaccio
-  ECS_SERVICE: verdaccio-service
-  ECS_CLUSTER: verdaccio-asg-ECSCluster-ybYAOGuDHD1U
-  ECS_TASK_DEFINITION: task-definition.json
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  CONTAINER_NAME: verdaccio
+  ECR_REPOSITORY: ${{ github.event.inputs.ecr_repository }}
+  ECS_SERVICE: ${{ github.event.inputs.ecs_service }}
+  ECS_CLUSTER: ${{ github.event.inputs.ecs_cluster }}
 
 jobs:
-  deploy:
-    name: Deploy
+  build-image:
+    name: Build image (push only if changed)
     runs-on: ubuntu-latest
+    outputs:
+      image_changed: ${{ steps.check.outputs.image_changed }}
+      image: ${{ steps.check.outputs.image }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
             path: Verdaccio
-            ref: gmpm-verdaccio
-      - name: Update AWS credentials in Verdaccio config
-        run: |
-            sed -i "s/\${AWS_ACCESS_KEY_ID}/${{ secrets.AWS_ACCESS_KEY_ID }}/g" config.yaml.template
-            sed -i "s/\${AWS_SECRET_ACCESS_KEY}/${{ secrets.AWS_SECRET_ACCESS_KEY }}/g" config.yaml.template
-        working-directory: Verdaccio/docker-examples/v5/docker-s3-storage
+            ref: ${{ github.event.inputs.ref }}
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: 'us-west-2'
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2     
-      - name: Build, tag, and push image to Amazon ECR
-        id: build-image
+        uses: aws-actions/amazon-ecr-login@v2.1.4
+      - name: Compute image content hash and check ECR
+        id: check
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: latest
         run: |
-          # Build a docker container and
-          # push it to ECR so that it can
-          # be deployed to ECS.
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        working-directory: Verdaccio/docker-examples/v5/docker-s3-storage
-      - name: Fill in the new image ID in the Amazon ECS task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+          set -euo pipefail
+          # Hash everything that ends up in the image (build context files).
+          # Sorted, NUL-delimited so file ordering / spaces don't change the hash.
+          IMAGE_HASH=$(find . -type f -not -path './task-definition.json' \
+            -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-12)
+          IMAGE_TAG="src-${IMAGE_HASH}"
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          echo "Computed image tag: ${IMAGE_TAG}"
+
+          if aws ecr describe-images \
+              --repository-name "${ECR_REPOSITORY}" \
+              --image-ids imageTag="${IMAGE_TAG}" \
+              --region us-west-2 >/dev/null 2>&1; then
+            echo "Image ${IMAGE_TAG} already exists in ECR — skipping build and deploy."
+            echo "image_changed=false" >> "$GITHUB_OUTPUT"
+            echo "image=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Image ${IMAGE_TAG} not in ECR — building and pushing."
+            docker build \
+              -t "${IMAGE_URI}" \
+              -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest" .
+            docker push "${IMAGE_URI}"
+            docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+            echo "image_changed=true" >> "$GITHUB_OUTPUT"
+            echo "image=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: Verdaccio/docker-examples/v5/${{ github.event.inputs.working-directory }}
+
+  deploy:
+    name: Force new ECS deployment
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: needs.build-image.outputs.image_changed == 'true'
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
         with:
-          task-definition: Verdaccio/docker-examples/v5/docker-s3-storage/task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
-      - name: Deploy Amazon ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true        
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: 'us-west-2'
+      - name: Force new deployment
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --force-new-deployment \
+            --region us-west-2
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --region us-west-2
