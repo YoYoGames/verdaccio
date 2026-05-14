@@ -1,0 +1,41 @@
+# Environment variables - NEVER commit these!
+.env
+.env.local
+.env.production
+
+# Verdaccio storage
+storage/
+conf/htpasswd
+
+# Plugin node modules
+plugins/*/node_modules/
+plugins/*/package-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+verdaccio.log
+
+# JWT tokens (never commit these!)
+*.token
+tokens/
+*.jwt
+
+# Temporary files
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker volumes
+.docker/
+
+# Testing
+.npmrc.test
+test-results/

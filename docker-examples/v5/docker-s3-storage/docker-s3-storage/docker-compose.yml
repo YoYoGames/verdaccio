@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Mock Verification Server
+  verification-server:
+    build:
+      context: ./plugins/verdaccio-dual-jwt-auth
+      dockerfile: Dockerfile.verify
+    container_name: verdaccio-verify-server
+    ports:
+      - "3000:3000"
+    environment:
+      - LICENSE_SECRET=${LICENSE_SECRET}
+    restart: unless-stopped
+    networks:
+      - verdaccio-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/verify-license"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Verdaccio with Dual JWT Auth
+  verdaccio:
+    build: .
+    platform: linux/amd64
+    container_name: verdaccio-jwt-test
+    ports:
+      - "4873:4873"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - LICENSE_SECRET=${LICENSE_SECRET}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - FROM_NAME=${FROM_NAME}
+    volumes:
+      - verdaccio-storage:/verdaccio/storage
+      - ./config.yaml:/verdaccio/conf/config.yaml
+    restart: unless-stopped
+    command: ["verdaccio", "--config", "/verdaccio/conf/config.yaml", "--listen", "0.0.0.0:4873"]
+    depends_on:
+      verification-server:
+        condition: service_healthy
+    networks:
+      - verdaccio-network
+
+volumes:
+  verdaccio-storage:
+    driver: local
+
+networks:
+  verdaccio-network:
+    driver: bridge

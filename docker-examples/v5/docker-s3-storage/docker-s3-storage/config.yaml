@@ -1,0 +1,57 @@
+storage: /verdaccio/storage
+plugins: /verdaccio/plugins
+
+# S3 Storage - Enabled
+store:
+  verdaccio-aws-s3-storage:
+    bucket: jwt-test-verdaccio
+    keyPrefix: packages/
+    region: us-east-2
+    s3ForcePathStyle: true
+    accessKeyId: # Access Key Id
+    secretAccessKey: # Secret Access Key
+
+web:
+  enable: false
+
+# Developer login. Set ADMIN_USERNAME and ADMIN_PASSWORD env vars.
+# Only the configured admin account can log in — no self-registration.
+auth:
+  verdaccio-dual-jwt-auth:
+    # adminUsername and adminPassword are read from ADMIN_USERNAME / ADMIN_PASSWORD env vars
+
+# GM JWT middleware — gates all read/install requests.
+# Requests with a Verdaccio session token (Authorization: Bearer) pass through
+# for developer publish operations.
+middlewares:
+  verdaccio-dual-jwt-auth:
+    gameMakerAuthUrl: https://auth.gamemaker.io/oauth/userinfo
+    licenceApiUrl: https://api.gamemaker.io/platform/v1/licence.plist
+    requiredLicence: switch     # Uncomment and set to gate access by console licence.
+                                # Valid values: ps4, ps5, xboxone, xboxseriesxs, switch, switch2
+                                # When set, clients must also send X-GameMaker-Device-ID header.
+    timeout: 10000
+    cache: true
+    cacheTTL: 300000
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+
+packages:
+  '**':
+    access: $all
+    publish: $authenticated
+    proxy: npmjs
+
+security:
+  api:
+    jwt:
+      sign:
+        expiresIn: 90d
+      secret: ${JWT_SECRET}
+
+log: { type: stdout, format: pretty, level: http }
+
+listen:
+  - 0.0.0.0:4873

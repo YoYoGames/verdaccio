@@ -1,0 +1,20 @@
+{
+  "name": "verdaccio-dual-jwt-auth",
+  "version": "1.0.0",
+  "description": "GameMaker auth plugin for Verdaccio — verifies GameMaker JWT access tokens against the GameMaker API",
+  "main": "index.js",
+  "keywords": ["verdaccio", "plugin", "auth", "jwt", "middleware"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy": "^1.18.1",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^2.7.0",
+    "plist": "^3.1.0"
+  },
+  "scripts": {
+    "mock-server": "node mock-verify-server.js",
+    "proxy": "node npm-proxy.js"
+  }
+}
